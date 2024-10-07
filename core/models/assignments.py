@@ -31,8 +31,17 @@ class Assignment(db.Model):
     created_at = db.Column(db.TIMESTAMP(timezone=True), default=helpers.get_utc_now, nullable=False)
     updated_at = db.Column(db.TIMESTAMP(timezone=True), default=helpers.get_utc_now, nullable=False, onupdate=helpers.get_utc_now)
 
-    def __repr__(self):
-        return '<Assignment %r>' % self.id
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'student_id': self.student_id,
+            'teacher_id': self.teacher_id,
+            'content': self.content,
+            'state': self.state,
+            'grade': self.grade,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at
+        }
 
     @classmethod
     def filter(cls, *criterion):
@@ -47,10 +56,13 @@ class Assignment(db.Model):
     def upsert(cls, assignment_new: 'Assignment'):
         if assignment_new.id is not None:
             assignment = Assignment.get_by_id(assignment_new.id)
+            
             assertions.assert_found(assignment, 'No assignment with this id was found')
             assertions.assert_valid(assignment.state == AssignmentStateEnum.DRAFT,
                                     'only assignment in draft state can be edited')
-
+            assignment.content = assignment_new.content
+            
+            assignment.state = AssignmentStateEnum.DRAFT
             assignment.content = assignment_new.content
         else:
             assignment = assignment_new
@@ -73,16 +85,19 @@ class Assignment(db.Model):
 
 
     @classmethod
-    def mark_grade(cls, _id, grade, auth_principal: AuthPrincipal):
+    def mark_grade(cls, _id, grade, auth_principal):
         assignment = Assignment.get_by_id(_id)
         assertions.assert_found(assignment, 'No assignment with this id was found')
-        assertions.assert_valid(grade is not None, 'assignment with empty grade cannot be graded')
-
+        assertions.assert_valid(grade is not None, 'Assignment with empty grade cannot be graded')
+        assertions.assert_valid(grade in GradeEnum.__members__.values(), 'Assignment with empty grade cannot be graded')
+        assertions.assert_auth(assignment.state != AssignmentStateEnum.DRAFT, 'Draft assignment cannot be graded')
+        # Update the grade and state
         assignment.grade = grade
         assignment.state = AssignmentStateEnum.GRADED
         db.session.flush()
-
+    
         return assignment
+
 
     @classmethod
     def get_assignments_by_student(cls, student_id):
@@ -91,3 +106,5 @@ class Assignment(db.Model):
     @classmethod
     def get_assignments_by_teacher(cls):
         return cls.query.all()
+    
+    

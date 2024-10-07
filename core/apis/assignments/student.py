@@ -2,9 +2,9 @@ from flask import Blueprint
 from core import db
 from core.apis import decorators
 from core.apis.responses import APIResponse
-from core.models.assignments import Assignment
-
+from core.models.assignments import Assignment, AssignmentStateEnum
 from .schema import AssignmentSchema, AssignmentSubmitSchema
+
 student_assignments_resources = Blueprint('student_assignments_resources', __name__)
 
 
@@ -24,7 +24,7 @@ def upsert_assignment(p, incoming_payload):
     """Create or Edit an assignment"""
     assignment = AssignmentSchema().load(incoming_payload)
     assignment.student_id = p.student_id
-
+    
     upserted_assignment = Assignment.upsert(assignment)
     db.session.commit()
     upserted_assignment_dump = AssignmentSchema().dump(upserted_assignment)
@@ -44,5 +44,11 @@ def submit_assignment(p, incoming_payload):
         auth_principal=p
     )
     db.session.commit()
-    submitted_assignment_dump = AssignmentSchema().dump(submitted_assignment)
-    return APIResponse.respond(data=submitted_assignment_dump)
+    if submitted_assignment and submitted_assignment.state is not AssignmentStateEnum.SUBMITTED:
+        submitted_assignment.state = AssignmentStateEnum.SUBMITTED
+        submitted_assignment_dump = AssignmentSchema().dump(submitted_assignment)
+        return APIResponse.respond(data=submitted_assignment_dump)
+    else:
+        return APIResponse.respond(data={'error':'FyleError', 'message':'only a draft assignment can be submitted'})
+    
+    

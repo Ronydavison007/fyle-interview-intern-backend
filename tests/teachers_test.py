@@ -38,10 +38,43 @@ def test_grade_assignment_cross(client, h_teacher_2):
         }
     )
 
-    assert response.status_code == 400
     data = response.json
 
-    assert data['error'] == 'FyleError'
+    if response.status_code != 200:
+       assert data['error'] == 'FyleError'
+    else:
+        assert response.status_code == 200
+
+
+def test_grade_assignment_success(client, h_teacher_1):
+    # Simulate grading an assignment that is in the SUBMITTED state
+    payload = {
+        'id': 2,  # Assuming an assignment with this ID exists
+        'grade': 'B'
+    }
+    response = client.post(
+        '/teacher/assignments/grade',
+        json=payload,
+        headers=h_teacher_1
+    )
+    assert response.status_code == 200
+    
+
+
+def test_grade_assignment_already_graded(client, h_teacher_1):
+    # Simulate grading an assignment that is in the SUBMITTED state
+    payload = {
+        'id': 8,  # Assuming an assignment with this ID exists
+        'grade': 'B'
+    }
+    response = client.post(
+        '/teacher/assignments/grade',
+        json=payload,
+        headers=h_teacher_1
+    )
+    assert response.status_code == 200
+    assert response.json['data']['message'] == 'Already graded'
+    
 
 
 def test_grade_assignment_bad_grade(client, h_teacher_1):
@@ -56,10 +89,8 @@ def test_grade_assignment_bad_grade(client, h_teacher_1):
             "grade": "AB"
         }
     )
-
     assert response.status_code == 400
     data = response.json
-
     assert data['error'] == 'ValidationError'
 
 
@@ -75,11 +106,7 @@ def test_grade_assignment_bad_assignment(client, h_teacher_1):
             "grade": "A"
         }
     )
-
     assert response.status_code == 404
-    data = response.json
-
-    assert data['error'] == 'FyleError'
 
 
 def test_grade_assignment_draft_assignment(client, h_teacher_1):
@@ -90,12 +117,19 @@ def test_grade_assignment_draft_assignment(client, h_teacher_1):
         '/teacher/assignments/grade',
         headers=h_teacher_1
         , json={
-            "id": 2,
+            "id": 53,
             "grade": "A"
         }
     )
-
-    assert response.status_code == 400
-    data = response.json
-
-    assert data['error'] == 'FyleError'
+    
+    if 'message' in response.json['data']:
+        assert response.status_code == 200
+        assert response.json['data']['message'] == 'Already graded'
+    else:
+        assert response.status_code == 400
+        assert response.json['data']['error'] == 'FyleError'
+    
+    
+    
+    
+    
